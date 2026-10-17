@@ -1,0 +1,38 @@
+{
+  "comments": {
+    "lineComment": "//"
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "indentationRules": {
+    "increaseIndentPattern": "^.*[{\\[(]\\s*(//.*)?$",
+    "decreaseIndentPattern": "^\\s*[}\\])]"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*//!.*$",
+      "action": { "indent": "none", "appendText": "//! " }
+    },
+    {
+      "beforeText": "^\\s*///(?!/).*$",
+      "action": { "indent": "none", "appendText": "/// " }
+    }
+  ],
+  "wordPattern": "'?[A-Za-z_][A-Za-z0-9_]*|-?[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?"
+}

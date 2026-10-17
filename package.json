@@ -1,0 +1,56 @@
+{
+  "name": "silk",
+  "displayName": "Silk",
+  "description": "Silk language support for Visual Studio Code.",
+  "version": "0.0.1",
+  "publisher": "silk-lang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silk-lang/silk-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/silk-lang/silk-vscode/issues"
+  },
+  "homepage": "https://github.com/silk-lang/silk-vscode#readme",
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "silk"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "silk",
+        "aliases": [
+          "Silk",
+          "silk"
+        ],
+        "extensions": [
+          ".silk"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "silk",
+        "scopeName": "source.silk",
+        "path": "./syntaxes/silk.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "vscode-tmgrammar-test \"test/grammar/**/*.silk\"",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "4.0.0",
+    "vscode-tmgrammar-test": "0.1.3"
+  },
+  "packageManager": "pnpm@11.10.0"
+}
