@@ -9,9 +9,9 @@ definition, formatting) will come from the native Silk compiler.
 ## Develop
 
 ```sh
-pnpm install
-pnpm test       # grammar assertions in test/grammar
-pnpm package    # builds silk-<version>.vsix
+bun install
+bun run test      # grammar assertions in test/grammar
+bun run package   # builds silk-<version>.vsix
 ```
 
 Open this folder in VS Code and press <kbd>F5</kbd> to launch an Extension Development Host with
