@@ -3,6 +3,7 @@
   "displayName": "Silk",
   "description": "Silk language support for Visual Studio Code.",
   "version": "0.0.1",
+  "private": true,
   "publisher": "silk-lang",
   "license": "MIT",
   "icon": "icon.png",
@@ -47,9 +48,13 @@
   },
   "scripts": {
     "test": "vscode-tmgrammar-test \"test/grammar/**/*.silk\"",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "changeset": "changeset",
+    "version": "changeset version && bun install --lockfile-only",
+    "release": "vsce publish --azure-credential --skip-duplicate --packagePath silk.vsix"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@vscode/vsce": "4.0.0",
     "vscode-tmgrammar-test": "0.1.3"
   },

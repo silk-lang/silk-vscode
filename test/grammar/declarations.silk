@@ -10,6 +10,26 @@
 import silk.ownership { Copy }
 // <------ keyword.other.import.silk
 //                      ^^^^ entity.name.type.silk
+//     ^^^^^^^^^^^^^^ meta.path.import.silk
+
+import silk.effect { Effect }
+//          ^^^^^^ meta.path.import.silk - storage.modifier.silk
+//                   ^^^^^^ entity.name.type.silk
+import silk.bool
+//          ^^^^ meta.path.import.silk - support.type.primitive.silk
+import silk.i32 as integers // effect
+//          ^^^ meta.path.import.silk - support.type.primitive.silk
+//              ^^ keyword.other.import.silk
+//                          ^^^^^^^^^ comment.line.double-slash.silk
+import Release { Pending }
+//     ^^^^^^^ meta.path.import.silk - entity.name.type.silk
+//               ^^^^^^^ entity.name.type.silk
+import silk.effect.bool
+//     ^^^^^^^^^^^^^^^^ meta.path.import.silk
+//          ^^^^^^ - storage.modifier.silk
+//                 ^^^^ - support.type.primitive.silk
+let enabled: bool = true
+//           ^^^^ support.type.primitive.silk
 
 pub struct Span {
 // <--- storage.modifier.silk
