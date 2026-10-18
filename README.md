@@ -25,6 +25,7 @@ code --install-extension silk-0.0.1.vsix
 
 | Path                            | Contents                                      |
 | ------------------------------- | --------------------------------------------- |
+| `icon.png`                     | Extension thumbnail for VS Code and Marketplace |
 | `syntaxes/silk.tmLanguage.json` | TextMate grammar (`source.silk`)              |
 | `language-configuration.json`   | Comments, brackets, auto-closing, indentation |
 | `test/grammar/`                 | `vscode-tmgrammar-test` scope assertions      |
