@@ -2,20 +2,25 @@
 
 Language support for [Silk](https://github.com/silk-lang/silk) `.silk` files.
 
-Today the extension provides syntax highlighting, bracket matching, comment toggling, and
-documentation-comment continuation. Language server features (diagnostics, hover, go to
-definition, formatting) will come from the native Silk compiler.
+The extension provides syntax highlighting, bracket matching, comment toggling, and
+documentation-comment continuation. It also starts the native compiler's language server,
+`silk lsp`, which reports syntax errors as you type and provides the document outline, folding,
+and Format Document. More features will come from the compiler as the server grows.
+
+The server runs `silk` from `PATH`. To use another compiler, such as one you built, set
+`silk.path` to its full path.
 
 ## Develop
 
 ```sh
 bun install
 bun run test      # grammar assertions in test/grammar
+bun run build     # bundles src/extension.js into dist/extension.js
 bun run package   # builds silk-<version>.vsix
 ```
 
-Open this folder in VS Code and press <kbd>F5</kbd> to launch an Extension Development Host with
-the extension loaded. To install a build locally:
+Run `bun run build`, then open this folder in VS Code and press <kbd>F5</kbd> to launch an
+Extension Development Host with the extension loaded. To install a build locally:
 
 ```sh
 bun run package --out silk.vsix
@@ -81,11 +86,12 @@ The version-PR job has no Marketplace credentials or OIDC permission.
 | `icon.png`                     | Extension thumbnail for VS Code and Marketplace |
 | `syntaxes/silk.tmLanguage.json` | TextMate grammar (`source.silk`)              |
 | `language-configuration.json`   | Comments, brackets, auto-closing, indentation |
+| `src/extension.js`              | Language client that starts `silk lsp`        |
 | `test/grammar/`                 | `vscode-tmgrammar-test` scope assertions      |
 
-The extension is declarative for now. The language client will live in `src/` with a `main` entry
-in `package.json` that starts the native compiler's language server; the grammar and language
-configuration stay as they are.
+The language client in `src/` is bundled with esbuild into `dist/extension.js`, the package's
+`main`. It launches `silk lsp` over standard input and output and restarts it when `silk.path`
+changes; all language features come from the server.
 
 ## Grammar
 
