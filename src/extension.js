@@ -18,11 +18,20 @@ const start = () => {
   return client.start()
 }
 
+// Stops the current client whatever state it is in, including after it gave up on a server
+// that kept crashing, then starts one on the new path.
+const restart = async () => {
+  const previous = client
+  client = undefined
+  await previous?.dispose().catch(() => {})
+  return start()
+}
+
 exports.activate = (context) => {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((change) => {
       if (change.affectsConfiguration('silk.path')) {
-        void client.stop().then(start)
+        void restart()
       }
     }),
   )
