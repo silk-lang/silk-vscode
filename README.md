@@ -11,7 +11,8 @@ The server runs `silk` from `PATH`. To use another compiler, such as one you bui
 `silk.path` to its full path.
 
 Each workspace folder gets its own server, started in that folder, so it runs the toolchain the
-folder's `silk.toml` pins with `silk-version`. Two folders pinned to different versions run two
+folder's `silk.toml` pins with `silk-version`. That server also serves the standard library its
+toolchain reads, so hover and go to definition keep working after you jump into the library. Two folders pinned to different versions run two
 servers with two compilers. When the pinned toolchain is not installed, the extension offers to
 install it (`silk toolchain install`) or to use the installed compiler instead. Editing
 `silk-version` restarts the folder's server on the newly selected toolchain, and
