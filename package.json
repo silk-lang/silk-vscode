@@ -47,6 +47,13 @@
         "path": "./syntaxes/silk.tmLanguage.json"
       }
     ],
+    "commands": [
+      {
+        "command": "silk.restartServer",
+        "title": "Restart Language Server",
+        "category": "Silk"
+      }
+    ],
     "configuration": {
       "title": "Silk",
       "properties": {
