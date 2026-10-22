@@ -10,6 +10,14 @@ and Format Document. More features will come from the compiler as the server gro
 The server runs `silk` from `PATH`. To use another compiler, such as one you built, set
 `silk.path` to its full path.
 
+Each workspace folder gets its own server, started in that folder, so it runs the toolchain the
+folder's `silk.toml` pins with `silk-version`. Two folders pinned to different versions run two
+servers with two compilers. When the pinned toolchain is not installed, the extension offers to
+install it (`silk toolchain install`) or to use the installed compiler instead. Editing
+`silk-version` restarts the folder's server on the newly selected toolchain, and
+**Silk: Restart Language Server** restarts every server. Compilers that predate `silk toolchain`
+run the server themselves, as before.
+
 ## Develop
 
 ```sh
@@ -90,8 +98,9 @@ The version-PR job has no Marketplace credentials or OIDC permission.
 | `test/grammar/`                 | `vscode-tmgrammar-test` scope assertions      |
 
 The language client in `src/` is bundled with esbuild into `dist/extension.js`, the package's
-`main`. It launches `silk lsp` over standard input and output and restarts it when `silk.path`
-changes; all language features come from the server.
+`main`. It runs `silk toolchain which --json` in each workspace folder, then launches `silk lsp`
+there over standard input and output. It restarts a server when `silk.path` changes or a
+`silk.toml` change selects another toolchain; all language features come from the server.
 
 ## Grammar
 
