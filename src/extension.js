@@ -4,16 +4,30 @@
 // `silk toolchain which --json` says whether that toolchain is installed, and a missing one is
 // offered for installation instead of failing. Servers restart when `silk.path` changes or a
 // `silk.toml` change selects another toolchain.
+//
+// Every Silk file has exactly one server, or VS Code would show each hover and definition once
+// per server. A folder's server also serves the standard library its toolchain reads, so go to
+// definition into the library keeps working there. Files outside every folder and library go to
+// one more server, which lists them by path.
 const vscode = require('vscode')
 const { execFile } = require('node:child_process')
+const { existsSync, realpathSync } = require('node:fs')
+const path = require('node:path')
 const { LanguageClient } = require('vscode-languageclient/node')
 
 // The `silk toolchain` exit status for a selected toolchain that is not installed.
 const NOT_INSTALLED = 3
 
-// Servers by workspace folder URI, each `{ selected, client }`; the empty key serves Silk files
-// outside every folder. An entry without a client is a server that is starting or was declined.
+// Servers by workspace folder URI, each `{ selected, client, library }`, where `library` is the
+// standard library directory the server also serves; the empty key serves the files in `outside`.
+// An entry without a client is a server that is starting or was declined.
 const servers = new Map()
+
+// The standard library directory each folder's server last reported, kept across restarts.
+const libraries = new Map()
+
+// The paths of the open Silk files outside every folder and served library.
+const outside = []
 
 const command = () => vscode.workspace.getConfiguration('silk').get('path', 'silk')
 
@@ -68,6 +82,53 @@ const install = (cwd, selected) =>
     },
   )
 
+// A glob pattern for the path `file`, with glob syntax escaped so it matches literally.
+const literal = (file) => file.replace(/\\/g, '/').replace(/[*?{}[\]]/g, (special) => `[${special}]`)
+
+const under = (directory, file) => {
+  const relative = path.relative(directory, file)
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+// The standard library beside a toolchain's compiler, as `silk lsp` finds it, when it exists.
+const libraryBeside = (selected) => {
+  if (!selected?.path) {
+    return undefined
+  }
+  try {
+    const library = path.join(path.dirname(path.dirname(realpathSync(selected.path))), 'lib', 'silk', 'stdlib')
+    return existsSync(library) ? library : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// The key of the server that serves `file`, when one does.
+const serving = (file) => {
+  for (const [key, entry] of servers) {
+    if (key && entry.library && under(entry.library, file)) {
+      return key
+    }
+  }
+  return outside.includes(file) ? '' : undefined
+}
+
+// Whether another folder's server already serves `library`.
+const claimed = (key, library) =>
+  [...servers].some(([other, entry]) => other !== key && entry.library === library)
+
+const selectorFor = (key, folder, library) => {
+  const filter = (pattern) => ({ scheme: 'file', language: 'silk', pattern })
+  if (!key) {
+    return outside.map((file) => filter(literal(file)))
+  }
+  const selector = [filter(`${literal(folder.uri.fsPath)}/**/*`)]
+  if (library) {
+    selector.push(filter(`${literal(library)}/**/*`))
+  }
+  return selector
+}
+
 // Starts the server for `folder` into `entry`, first installing its toolchain when the user
 // agrees. "Use installed version" runs the server with SILK_TOOLCHAIN=local, the configured
 // compiler. A restart or stop while this waits replaces `entry`, and this start then gives up.
@@ -91,26 +152,27 @@ const start = async (key, folder, entry) => {
   if (servers.get(key) !== entry) {
     return
   }
+  // The library the server reported last time, or else the one beside its toolchain's compiler.
+  if (key) {
+    const library = libraries.get(key) ?? libraryBeside(env ? undefined : selected)
+    entry.library = library && !claimed(key, library) ? library : undefined
+  }
   // Without a transport, the client speaks over stdio and adds no `--stdio` argument.
   const server = { command: command(), args: ['lsp'], options: { cwd, env } }
   const client = new LanguageClient(
     'silk',
     folder ? `Silk (${folder.name})` : 'Silk',
     { run: server, debug: server },
-    {
-      documentSelector: [
-        folder
-          ? { scheme: 'file', language: 'silk', pattern: `${folder.uri.fsPath}/**/*` }
-          : { scheme: 'file', language: 'silk' },
-      ],
-      workspaceFolder: folder,
-    },
+    { documentSelector: selectorFor(key, folder, entry.library), workspaceFolder: folder },
   )
   // A forced local server is reselected on the next manifest change.
   entry.selected = env ? undefined : selected
   entry.client = client
   try {
     await client.start()
+    if (key) {
+      await adopt(key, entry, client)
+    }
   } catch (error) {
     const compiler = selected ? `Silk ${selected.version}` : command()
     void vscode.window.showErrorMessage(
@@ -118,6 +180,31 @@ const start = async (key, folder, entry) => {
         `language server have none; pin a newer one with "silk toolchain use <version>". ` +
         `${error?.message ?? ''}`.trim(),
     )
+  }
+}
+
+// Records the standard library the started server reports reading. A library other than the one
+// the server was started with restarts it to serve that one; files that now have a folder's
+// server leave the outside server.
+const adopt = async (key, entry, client) => {
+  const reported = client.initializeResult?.capabilities?.experimental?.standardLibrary
+  if (typeof reported !== 'string' || servers.get(key) !== entry) {
+    return
+  }
+  const library = vscode.Uri.parse(reported).fsPath
+  libraries.set(key, library)
+  if (library !== entry.library && !claimed(key, library)) {
+    await restart(key)
+    return
+  }
+  const before = outside.length
+  for (let at = outside.length - 1; at >= 0; at--) {
+    if (serving(outside[at]) === key) {
+      outside.splice(at, 1)
+    }
+  }
+  if (outside.length !== before) {
+    await (outside.length > 0 ? restart('') : stop(''))
   }
 }
 
@@ -135,22 +222,31 @@ const stop = async (key) => {
 
 const restart = async (key) => {
   await stop(key)
-  const entry = { selected: undefined, client: undefined }
+  const entry = { selected: undefined, client: undefined, library: undefined }
   servers.set(key, entry)
   await start(key, folderOf(key), entry)
 }
 
 const restartAll = () => Promise.all([...servers.keys()].map(restart))
 
-// Starts the server for a Silk document's folder unless one exists.
+// Starts the server for a Silk document's folder unless one exists. A file outside every folder
+// and served library joins the outside server's files, which restarts it to serve them.
 const ensure = (document) => {
   if (document.languageId !== 'silk' || document.uri.scheme !== 'file') {
     return
   }
   const folder = vscode.workspace.getWorkspaceFolder(document.uri)
+  if (!folder) {
+    const file = document.uri.fsPath
+    if (serving(file) === undefined) {
+      outside.push(file)
+      void restart('')
+    }
+    return
+  }
   const key = folderKey(folder)
   if (!servers.has(key)) {
-    const entry = { selected: undefined, client: undefined }
+    const entry = { selected: undefined, client: undefined, library: undefined }
     servers.set(key, entry)
     void start(key, folder, entry)
   }
@@ -192,6 +288,7 @@ exports.activate = (context) => {
     vscode.workspace.onDidOpenTextDocument(ensure),
     vscode.workspace.onDidChangeWorkspaceFolders((event) => {
       for (const folder of event.removed) {
+        libraries.delete(folderKey(folder))
         void stop(folderKey(folder))
       }
     }),
