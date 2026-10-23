@@ -61,6 +61,11 @@
           "type": "string",
           "default": "silk",
           "description": "The Silk compiler that runs the language server (`silk lsp`), as a path or a command on PATH."
+        },
+        "silk.sewPath": {
+          "type": "string",
+          "default": "sew",
+          "description": "sew, which tells which Silk version a folder pins and installs it (`sew use`), as a path or a command on PATH."
         }
       }
     }

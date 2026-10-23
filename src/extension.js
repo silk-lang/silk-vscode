@@ -1,9 +1,10 @@
 // Runs the native compiler's language server, `silk lsp`, over standard input and output for
 // Silk documents. Each workspace folder gets its own server, started in that folder, so `silk`
-// dispatches to the toolchain the folder's `silk-version` pin selects. Before starting,
-// `silk toolchain which --json` says whether that toolchain is installed, and a missing one is
-// offered for installation instead of failing. Servers restart when `silk.path` changes or a
-// `silk.toml` change selects another toolchain.
+// (sew's proxy) runs the Silk version the folder's `silk-version` pin selects. Before starting,
+// `sew use which --json` says whether that version is installed, and a missing one is offered
+// for installation (`sew use`) instead of failing. Without sew, `silk lsp` simply runs. Servers
+// restart when `silk.path` or `silk.sewPath` changes or a `silk.toml` change selects another
+// version.
 //
 // Every Silk file has exactly one server, or VS Code would show each hover and definition once
 // per server. A folder's server also serves the standard library its toolchain reads, so go to
@@ -15,7 +16,7 @@ const { existsSync, realpathSync } = require('node:fs')
 const path = require('node:path')
 const { LanguageClient } = require('vscode-languageclient/node')
 
-// The `silk toolchain` exit status for a selected toolchain that is not installed.
+// The `sew use which` exit status for a selected version that is not installed.
 const NOT_INSTALLED = 3
 
 // Servers by workspace folder URI, each `{ selected, client, library }`, where `library` is the
@@ -31,18 +32,20 @@ const outside = []
 
 const command = () => vscode.workspace.getConfiguration('silk').get('path', 'silk')
 
+const sew = () => vscode.workspace.getConfiguration('silk').get('sewPath', 'sew')
+
+// Runs sew with `args` in `cwd`; a sew that cannot start reports status -1.
 const run = (args, cwd) =>
   new Promise((resolve) => {
-    execFile(command(), args, { cwd, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
+    execFile(sew(), args, { cwd, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
       const status = error ? (typeof error.code === 'number' ? error.code : -1) : 0
       resolve({ status, stdout: String(stdout), stderr: String(stderr) })
     })
   })
 
-// The toolchain `silk` selects in `cwd`, or undefined when the compiler predates
-// `silk toolchain` and so runs the server itself.
+// The version sew selects in `cwd`, or undefined without sew, when `silk` runs the server itself.
 const which = async (cwd) => {
-  const result = await run(['toolchain', 'which', '--json'], cwd)
+  const result = await run(['use', 'which', '--json'], cwd)
   if (result.status !== 0 && result.status !== NOT_INSTALLED) {
     return undefined
   }
@@ -72,7 +75,7 @@ const install = (cwd, selected) =>
   vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Installing Silk ${selected.version}` },
     async () => {
-      const result = await run(['toolchain', 'install', '--json'], cwd)
+      const result = await run(['use', '--json'], cwd)
       if (result.status === 0) {
         return true
       }
@@ -90,7 +93,7 @@ const under = (directory, file) => {
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
-// The standard library beside a toolchain's compiler, as `silk lsp` finds it, when it exists.
+// The standard library beside a version's compiler, as `silk lsp` finds it, when it exists.
 const libraryBeside = (selected) => {
   if (!selected?.path) {
     return undefined
@@ -129,21 +132,32 @@ const selectorFor = (key, folder, library) => {
   return selector
 }
 
-// Starts the server for `folder` into `entry`, first installing its toolchain when the user
-// agrees. "Use installed version" runs the server with SILK_TOOLCHAIN=local, the configured
-// compiler. A restart or stop while this waits replaces `entry`, and this start then gives up.
+// Your default Silk version (`sew use <version>`), when one is installed.
+const installedDefault = async (cwd) => {
+  const result = await run(['use', 'list', '--json'], cwd)
+  try {
+    return JSON.parse(result.stdout).toolchains?.find((toolchain) => toolchain.default)?.version
+  } catch {
+    return undefined
+  }
+}
+
+// Starts the server for `folder` into `entry`, first installing its version when the user
+// agrees. "Use <default>" runs the server with SILK_TOOLCHAIN set to your default version
+// instead. A restart or stop while this waits replaces `entry`, and this start then gives up.
 const start = async (key, folder, entry) => {
   const cwd = folder?.uri.fsPath
   const selected = await which(cwd)
   let env
   if (selected && !selected.installed) {
+    const fallback = await installedDefault(cwd)
+    const instead = fallback && `Use ${fallback}`
     const choice = await vscode.window.showWarningMessage(
       `Silk ${selected.version} is pinned in ${source(selected)} but not installed.`,
-      'Install',
-      'Use installed version',
+      ...(instead ? ['Install', instead] : ['Install']),
     )
-    if (choice === 'Use installed version') {
-      env = { ...process.env, SILK_TOOLCHAIN: 'local' }
+    if (instead && choice === instead) {
+      env = { ...process.env, SILK_TOOLCHAIN: fallback }
     } else if (choice !== 'Install' || !(await install(cwd, selected))) {
       entry.selected = selected
       return
@@ -152,7 +166,7 @@ const start = async (key, folder, entry) => {
   if (servers.get(key) !== entry) {
     return
   }
-  // The library the server reported last time, or else the one beside its toolchain's compiler.
+  // The library the server reported last time, or else the one beside its version's compiler.
   if (key) {
     const library = libraries.get(key) ?? libraryBeside(env ? undefined : selected)
     entry.library = library && !claimed(key, library) ? library : undefined
@@ -165,7 +179,7 @@ const start = async (key, folder, entry) => {
     { run: server, debug: server },
     { documentSelector: selectorFor(key, folder, entry.library), workspaceFolder: folder },
   )
-  // A forced local server is reselected on the next manifest change.
+  // A server forced onto the default is reselected on the next manifest change.
   entry.selected = env ? undefined : selected
   entry.client = client
   try {
@@ -177,7 +191,7 @@ const start = async (key, folder, entry) => {
     const compiler = selected ? `Silk ${selected.version}` : command()
     void vscode.window.showErrorMessage(
       `${compiler} could not start its language server (silk lsp). Compilers older than the ` +
-        `language server have none; pin a newer one with "silk toolchain use <version>". ` +
+        `language server have none; pin a newer one with "sew set <version>", then "sew use". ` +
         `${error?.message ?? ''}`.trim(),
     )
   }
@@ -252,8 +266,8 @@ const ensure = (document) => {
   }
 }
 
-// After a `silk.toml` change, restarts each server whose folder now selects another toolchain,
-// or whose missing toolchain has since been installed.
+// After a `silk.toml` change, restarts each server whose folder now selects another version, or
+// whose missing version has since been installed.
 const reselect = async () => {
   for (const [key, entry] of [...servers]) {
     const selected = await which(folderOf(key)?.uri.fsPath)
@@ -281,7 +295,7 @@ exports.activate = (context) => {
     manifests.onDidCreate(changed),
     manifests.onDidDelete(changed),
     vscode.workspace.onDidChangeConfiguration((change) => {
-      if (change.affectsConfiguration('silk.path')) {
+      if (change.affectsConfiguration('silk.path') || change.affectsConfiguration('silk.sewPath')) {
         void restartAll()
       }
     }),
