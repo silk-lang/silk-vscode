@@ -1,10 +1,10 @@
 // Runs the native compiler's language server, `silk lsp`, over standard input and output for
-// Silk documents. Each workspace folder gets its own server, started in that folder, so `silk`
-// (sew's proxy) runs the Silk version the folder's `silk-version` pin selects. Before starting,
-// `sew use which --json` says whether that version is installed, and a missing one is offered
-// for installation (`sew use`) instead of failing. Without sew, `silk lsp` simply runs. Servers
-// restart when `silk.path` or `silk.sewPath` changes or a `silk.toml` change selects another
-// version.
+// Silk documents. Each workspace folder gets its own server, started in that folder, so the silk
+// tool runs the compiler of the Silk version the folder's `silk-version` pin selects. Before
+// starting, `silk use which --json` says whether that version is installed, and a missing one is
+// offered for installation (`silk use`) instead of failing. A `silk.path` that names a compiler
+// (`silkc`) rather than the tool runs `silk lsp` as is. Servers restart when `silk.path` changes
+// or a `silk.toml` change selects another version.
 //
 // Every Silk file has exactly one server, or VS Code would show each hover and definition once
 // per server. A folder's server also serves the standard library its toolchain reads, so go to
@@ -16,7 +16,7 @@ const { existsSync, realpathSync } = require('node:fs')
 const path = require('node:path')
 const { LanguageClient } = require('vscode-languageclient/node')
 
-// The `sew use which` exit status for a selected version that is not installed.
+// The `silk use which` exit status for a selected version that is not installed.
 const NOT_INSTALLED = 3
 
 // Servers by workspace folder URI, each `{ selected, client, library }`, where `library` is the
@@ -32,18 +32,17 @@ const outside = []
 
 const command = () => vscode.workspace.getConfiguration('silk').get('path', 'silk')
 
-const sew = () => vscode.workspace.getConfiguration('silk').get('sewPath', 'sew')
-
-// Runs sew with `args` in `cwd`; a sew that cannot start reports status -1.
+// Runs the silk tool with `args` in `cwd`; one that cannot start reports status -1.
 const run = (args, cwd) =>
   new Promise((resolve) => {
-    execFile(sew(), args, { cwd, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
+    execFile(command(), args, { cwd, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
       const status = error ? (typeof error.code === 'number' ? error.code : -1) : 0
       resolve({ status, stdout: String(stdout), stderr: String(stderr) })
     })
   })
 
-// The version sew selects in `cwd`, or undefined without sew, when `silk` runs the server itself.
+// The version the silk tool selects in `cwd`, or undefined when `silk.path` names a compiler,
+// which runs the server itself.
 const which = async (cwd) => {
   const result = await run(['use', 'which', '--json'], cwd)
   if (result.status !== 0 && result.status !== NOT_INSTALLED) {
@@ -132,7 +131,7 @@ const selectorFor = (key, folder, library) => {
   return selector
 }
 
-// Your default Silk version (`sew use <version>`), when one is installed.
+// Your default Silk version (`silk use <version>`), when one is installed.
 const installedDefault = async (cwd) => {
   const result = await run(['use', 'list', '--json'], cwd)
   try {
@@ -191,7 +190,7 @@ const start = async (key, folder, entry) => {
     const compiler = selected ? `Silk ${selected.version}` : command()
     void vscode.window.showErrorMessage(
       `${compiler} could not start its language server (silk lsp). Compilers older than the ` +
-        `language server have none; pin a newer one with "sew set <version>", then "sew use". ` +
+        `language server have none; pin a newer one with "silk set <version>", then "silk use". ` +
         `${error?.message ?? ''}`.trim(),
     )
   }
@@ -295,7 +294,7 @@ exports.activate = (context) => {
     manifests.onDidCreate(changed),
     manifests.onDidDelete(changed),
     vscode.workspace.onDidChangeConfiguration((change) => {
-      if (change.affectsConfiguration('silk.path') || change.affectsConfiguration('silk.sewPath')) {
+      if (change.affectsConfiguration('silk.path')) {
         void restartAll()
       }
     }),
