@@ -60,7 +60,7 @@
         "silk.path": {
           "type": "string",
           "default": "silk",
-          "description": "The Silk compiler that runs the language server (`silk lsp`), as a path or a command on PATH."
+          "description": "The silk tool, which runs the language server (`silk lsp`) with the Silk version a folder pins, as a path or a command on PATH. A compiler (`silkc`) works too and runs the server as is."
         }
       }
     }
