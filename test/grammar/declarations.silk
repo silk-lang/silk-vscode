@@ -78,3 +78,16 @@ pub effect fn parse<'a>(source: string<'a>, mut count: &mut i32) -> Self ! OutOf
 //^^^^^^ keyword.control.silk
 //       ^^^^ constant.language.boolean.silk
 }
+
+@inlineAlways
+// <- punctuation.definition.annotation.silk
+//^^^^^^^^^^^^ entity.name.function.decorator.silk
+@foreign(memory: "read", noCapture: ("buffer"))
+//^^^^^^ entity.name.function.decorator.silk
+//               ^^^^^^ string.quoted.double.silk
+unsafe extern "C" fn sort(buffer: *mut u8) -> () as "sort"
+fn read(value: &Port #Reader) -> () {
+//                   ^ keyword.operator.role.silk
+//                    ^^^^^^ entity.name.type.role.silk
+  return
+}
