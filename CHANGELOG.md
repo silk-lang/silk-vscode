@@ -1,5 +1,15 @@
 # silk
 
+## 0.2.0
+
+### Minor Changes
+
+- 3e2f9a1: Ask the silk tool which Silk version a folder pins and install it with `silk use`, now that the compiler (`silkc`) has no `silk toolchain` command. A missing pinned version can run on your default version instead. `silk.path` may name the tool or a compiler; a compiler runs the language server as is.
+
+### Patch Changes
+
+- 39d9918: Highlight directives such as `@inlineAlways` and `@foreign(...)`, which replace `with` clauses, and the `#Role` marker on reference types.
+
 ## 0.1.1
 
 ### Patch Changes
