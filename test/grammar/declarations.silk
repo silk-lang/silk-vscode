@@ -91,3 +91,10 @@ fn read(value: &Port #Reader) -> () {
 //                    ^^^^^^ entity.name.type.role.silk
   return
 }
+
+pub ambient service Sink default sinks.Quiet {}
+//  ^^^^^^^ storage.modifier.silk
+//          ^^^^^^^ storage.type.service.silk
+//                  ^^^^ entity.name.type.silk
+//                       ^^^^^^^ storage.modifier.silk
+//                               ^^^^^^^^^^^ entity.name.type.silk

@@ -178,6 +178,24 @@
           }
         },
         {
+          "begin": "\\b(ambient)\\s+(service)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "storage.modifier.silk" },
+            "2": { "name": "storage.type.service.silk" },
+            "3": { "name": "entity.name.type.silk" }
+          },
+          "end": "(?=\\{)",
+          "patterns": [
+            {
+              "match": "\\b(default)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)",
+              "captures": {
+                "1": { "name": "storage.modifier.silk" },
+                "2": { "name": "entity.name.type.silk" }
+              }
+            }
+          ]
+        },
+        {
           "match": "\\b(struct|tuple|enum|union|type|service|interface|role)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "storage.type.$1.silk" },
